@@ -3,7 +3,7 @@ A collection of my Space Engineers scripts developed using MDK-SE (Malware's Dev
 
 #### SimpleEnergyDisplay  
 Shows on an LCD the percentage of remaining energy in a battery group and if it is being drained or recharged.  
-TODO features:  
-- Use an actual LCD panel, currently only working on the Programmable Block screen.
+
+Planned features:  
 - Being able to manage different battery groups with the same Programmable Block.
 - Being able to customize the LCD output.
