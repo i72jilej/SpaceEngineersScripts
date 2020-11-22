@@ -21,24 +21,27 @@ using System.Text.RegularExpressions;
 namespace IngameScript{
 	partial class Program : MyGridProgram{
 		#region mdk preserve
-		//BEGIN CONFIGURATION
-		//You can modify these settings
+		//=================
+		//--Configuration--
+		//=================
 
 		//Name of the battery group to monitor
-		const string groupName = "Battery Group Name";
+		const string batteriesGroupName = "Battery Group Name";
  
 		//Add this label anywhere in the LCD panels you want to display results
 		const string LCDLabel = "[SBD]";
 
-		//Set to true if you want to use the programmable block as a display
-		const bool useProgrammableBlockDisplay = true;
+		//=====================
+		//--End Configuration--
+		//=====================
 
-		//END CONFIGURATION
-		//Beyond this point, modify at your own risk.
+		//DO NOT MODIFY ANYTHING BEYOND THIS POINT
 		#endregion
 
-		float currCharge = 0;
-		float prevCharge = 0;
+		float _currCharge = 0;
+		float _prevCharge = 0;
+
+		MyIni _ini = new MyIni();
 
 		public Program(){
 			Runtime.UpdateFrequency = UpdateFrequency.Update100;
@@ -48,79 +51,46 @@ namespace IngameScript{
 		}
 
 		public void Main(string argument, UpdateType updateSource){
-			//Looking for the batteries groups
-			IMyBlockGroup batteryGroup = GridTerminalSystem.GetBlockGroupWithName(groupName);
-			if (batteryGroup == null){
-				Echo(string.Format("Battery group \"{0}\" not found.", groupName));
-				Echo("Check the script code and modify the \"groupName\" variable in the CONFIGURATION section");
+			
+			List<IMyBatteryBlock> batteriesList = new List<IMyBatteryBlock>();
+
+			IMyBlockGroup batteriesGroup = GridTerminalSystem.GetBlockGroupWithName(batteriesGroupName);
+			if (batteriesGroup == null) {
+				Echo(string.Format("Batteries group \"{0}\" not found.", batteriesGroupName));
+				Echo("Check the script code and modify the \"batteriesGroupName\" variable in the Configuration section");
 				return;
 			}
-			List<IMyBatteryBlock> batteryList = new List<IMyBatteryBlock>();
-			batteryGroup.GetBlocksOfType<IMyBatteryBlock>(batteryList);
-			Echo(string.Format("Found \"{0}\" battery group with {1} batteries", groupName, batteryList.Count));
-			Echo("-----");
-		   
-			//Looking for the LCD panels
-			List<IMyTerminalBlock> panels = new List<IMyTerminalBlock>();
-			GridTerminalSystem.SearchBlocksOfName(LCDLabel, panels, panel => panel is IMyTextPanel);
-			Echo(string.Format("Found {0} LCD panels", panels.Count));
-			Echo("-----");
+			batteriesGroup.GetBlocksOfType<IMyBatteryBlock>(batteriesList);
 
-			//Doing calculations
-			currCharge = 0;
-			batteryList.ForEach(delegate(IMyBatteryBlock obj){ 
-				currCharge += obj.CurrentStoredPower;
-			});
-			currCharge = currCharge / batteryList.Count;
+			for(int i = batteriesList.Count - 1; i >= 0; i--) {
+				_currCharge += batteriesList[i].CurrentStoredPower;
+			}
+			_currCharge = _currCharge / batteriesList.Count;
+
+			string status;
+			if(_currCharge < _prevCharge) {
+				status = "Discharging";
+			}
+			else if(_currCharge > _prevCharge) {
+				status = "Recharging";
+			}
+			else {
+				status = "Stable";
+			}
 			
-			Echo(string.Format("Current group charge: {0}", currCharge.ToString("P")));
-			if (currCharge > prevCharge)
-				Echo("Batteries are recharging.");
-			else if (currCharge < prevCharge)
-				Echo("Batteries are draining");
-			else
-				Echo("Batteries are not charging");
+			Echo(string.Format("Curr: {0}", _currCharge.ToString("P")));
+			Echo(string.Format("Prev: {0}", _prevCharge.ToString("P")));
+			Echo(string.Format("State: {0}", status));
 
-			//Displaying info
+			IMyTextSurface PB = Me.GetSurface(0);
+			PB.ContentType = ContentType.TEXT_AND_IMAGE;
+			PB.FontSize = 1.5f;
+			PB.Alignment = VRage.Game.GUI.TextPanel.TextAlignment.CENTER;
 
-			if (useProgrammableBlockDisplay){
-				IMyTextSurface PBSurface = Me.GetSurface(0);
-				drawSurface(ref PBSurface);
-			}
+			PB.WriteText(string.Format("{0}\n----\n{1}\n{2}", batteriesGroupName, _currCharge.ToString("P"), status));
 
-			panels.ForEach(delegate (IMyTerminalBlock obj){
-				IMyTextSurface LCDSurface = (IMyTextSurface)obj;
-				drawSurface(ref LCDSurface);
-			});
-
-			prevCharge = currCharge;
-		}
-
-		void drawSurface(ref IMyTextSurface surf){
-			//Draws the information on a text surface
-
-			string chargeText;
-
-			surf.BackgroundColor = new Color(0, 88, 151, 255);
-			surf.Alignment = TextAlignment.CENTER;
-			surf.FontColor = new Color(179, 237, 255, 255);
-
-			if (currCharge > prevCharge){
-				chargeText = "+Recharging+";
-			}
-			else if (currCharge < prevCharge){
-				chargeText = "-Discharging-";
-			}
-			else{
-				chargeText = "=Static=";
-			}
-
-			string text = groupName + "\n--------\n";
-			text += currCharge.ToString("P");
-			text += "\n";
-			text += chargeText;
-
-			surf.WriteText(text);
+			_prevCharge = _currCharge;
+			_currCharge = 0;
 		}
 	}
 }
